@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.env
+data/sample_images/
+data/chroma_index/
+data/metadata.json
+*.zip
