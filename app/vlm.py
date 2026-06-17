@@ -2,6 +2,7 @@
 
 import os
 import io
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 from PIL import Image
@@ -12,13 +13,14 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL          = "gemini-2.5-flash"
+MODEL          = "gemini-3-flash-preview"
 MAX_IMAGES     = 3  # max images to send per request — keeps tokens manageable
+MAX_RETRIES    = 3  # retries for transient 503 "model overloaded" errors
 
 
 class VLMClient:
     """
-    Wraps Gemini 2.5 Flash for multimodal medical Q&A.
+    Wraps Gemini 3 Flash Preview for multimodal medical Q&A.
     Takes a question + retrieved contexts → returns an answer.
     """
 
@@ -57,21 +59,47 @@ class VLMClient:
         # Structure: [image1, image2, image3, prompt_text]
         contents = image_parts + [prompt]
 
-        # ── Call Gemini ───────────────────────────────────────────────────────
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=(
-                    "You are an expert medical AI assistant specialising in pathology. "
-                    "You are given pathology images and related Q&A pairs as context. "
-                    "Answer the question accurately and concisely based on the visual "
-                    "evidence and context provided. If you are uncertain, say so clearly."
-                ),
-                temperature=0.1,  # low temperature — medical answers need precision
-                max_output_tokens=512,
-            )
-        )
+        # ── Call Gemini, with retry on transient 503 overload ───────────────────
+        response = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=(
+                            "You are an expert medical AI assistant specialising in pathology. "
+                            "You are given pathology images and related Q&A pairs as context. "
+                            "Answer the question accurately and concisely based on the visual "
+                            "evidence and context provided. If you are uncertain, say so clearly."
+                        ),
+                        temperature=0.1,
+                        max_output_tokens=512,
+                        safety_settings=[
+                            types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_ONLY_HIGH"),
+                            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_ONLY_HIGH"),
+                            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_ONLY_HIGH"),
+                            types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_ONLY_HIGH"),
+                        ],
+                    )
+                )
+                break  # success — exit retry loop
+
+            except Exception as e:
+                is_overloaded = "503" in str(e) or "UNAVAILABLE" in str(e)
+                if is_overloaded and attempt < MAX_RETRIES - 1:
+                    print(f"  ⚠️  Model overloaded, retrying in 10s... (attempt {attempt + 1}/{MAX_RETRIES})")
+                    time.sleep(10)
+                    continue
+                raise  # not a 503, or retries exhausted — propagate the error
+
+        # ── Handle blocked/empty responses ───────────────────────────────────────
+        if response is None or response.text is None:
+            print(f"  ⚠️  Gemini returned no text. Full response: {response}")
+            if response is not None and hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                print(f"  ⚠️  Finish reason: {getattr(candidate, 'finish_reason', 'unknown')}")
+            return "[No response generated — possibly blocked by safety filters or empty response]"
 
         return response.text.strip()
 
