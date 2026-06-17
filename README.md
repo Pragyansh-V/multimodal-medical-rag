@@ -15,7 +15,7 @@ Embed with MiniLM (text) or CLIP text encoder (image/hybrid)
       ↓
 ChromaDB retrieves top-k similar pathology images + Q&A pairs
       ↓
-Retrieved images + context sent to Gemini 2.5 Flash
+Retrieved images + context sent to Gemini 3 Flash Preview
       ↓
 VLM generates a grounded medical answer
 ```
@@ -35,7 +35,7 @@ MiniLM → text embeddings (384-dim)           └── CLIP text encoder
       ↓                                            (image/hybrid queries)
 ChromaDB PersistentClient                          ↓
       ↓                                       app/vlm.py
-Export index + images + metadata              └── Gemini 2.5 Flash
+Export index + images + metadata              └── Gemini 3 Flash Preview
 ```
 
 ---
@@ -100,9 +100,32 @@ curl -X POST "http://localhost:8000/query" \
     }
   ],
   "retrieval_mode": "hybrid",
-  "model_used": "gemini-2.5-flash",
+  "model_used": "gemini-3-flash-preview",
   "num_contexts": 3
 }
+```
+
+---
+
+## Evaluation — RAGAS Metrics
+
+Ran RAGAS evaluation comparing text-only vs hybrid retrieval modes on sample PathVQA questions, using Gemini 3 Flash Preview as both the answering VLM and the RAGAS judge.
+
+| Metric | Text mode | Hybrid mode |
+|---|---|---|
+| Faithfulness | 0.32 | **0.75** |
+| Answer Relevancy | 0.65 | 0.65 |
+| Context Precision | 0.00 | 0.11 |
+| Context Recall | 0.00 | 0.00 |
+
+**Key finding:** Hybrid retrieval (CLIP image embeddings + text embeddings) substantially improves faithfulness and precision over text-only retrieval. PathVQA reuses generic question templates (e.g. "what is present?") across many different images — text similarity alone can't distinguish between them, but CLIP's visual matching can.
+
+**Known limitation:** Context recall remained 0.0 in both modes — even hybrid retrieval returned duplicate results for some queries (e.g. "liver" retrieved twice for the same question). This suggests the 500-example knowledge base is too small for some ground-truth answers to be retrievable at all. A production system would need retrieval deduplication and a substantially larger knowledge base.
+
+Run the evaluation yourself:
+
+```bash
+python evaluation/ragas_eval.py
 ```
 
 ---
@@ -114,8 +137,11 @@ multimodal-medical-rag/
 ├── app/
 │   ├── main.py          # FastAPI server — lifespan, routes
 │   ├── retriever.py     # ChromaDB + CLIP + MiniLM retrieval
-│   ├── vlm.py           # Gemini 2.5 Flash VLM answering
+│   ├── vlm.py           # Gemini 3 Flash Preview VLM answering, with retry on transient overload
 │   └── schemas.py       # Pydantic request/response schemas
+├── evaluation/
+│   ├── test_set.py      # Ground-truth test questions from PathVQA metadata
+│   └── ragas_eval.py    # RAGAS evaluation pipeline (faithfulness, relevancy, precision, recall)
 ├── kaggle/
 │   └── embed_pathvqa.ipynb  # GPU notebook — embeddings + index
 ├── scripts/
@@ -177,7 +203,8 @@ Open `http://localhost:8000/docs` for the Swagger UI.
 | CLIP ViT-L/14 | Image embeddings (768-dim) |
 | all-MiniLM-L6-v2 | Text embeddings (384-dim) |
 | ChromaDB | Vector store — persistent, local |
-| Gemini 2.5 Flash | Vision-language answering |
+| Gemini 3 Flash Preview | Vision-language answering |
+| RAGAS | RAG-specific evaluation (faithfulness, relevancy, precision, recall) |
 | FastAPI | API server |
 | PathVQA | Pathology image-question dataset |
 | Kaggle T4 GPU | Embedding generation |
@@ -188,7 +215,9 @@ Open `http://localhost:8000/docs` for the Swagger UI.
 
 **Why two embedding models?** CLIP and MiniLM serve different purposes — CLIP enables cross-modal text→image retrieval (768-dim shared space), MiniLM gives stronger semantic text similarity (384-dim, faster). Hybrid mode combines both for best coverage.
 
-**Why Gemini 2.5 Flash?** Best free-tier vision model available — 1500 requests/day, strong medical image understanding, 1M token context window. Swappable via one config change.
+**Why Gemini 3 Flash Preview?** Strong multimodal reasoning with a large context window. Switched from 2.5 Flash mid-project after hitting account-specific free-tier rate limits — the model is swappable via one config change, and a retry wrapper handles transient overload errors gracefully.
+
+**Why evaluate with RAGAS?** Manual spot-checking (as in the original build) can't catch systematic retrieval failures. RAGAS's context precision/recall metrics specifically caught that text-only retrieval was matching on generic question phrasing rather than image content — a finding that wouldn't have surfaced from eyeballing a few example queries.
 
 **Why 500 examples?** Sufficient to demonstrate the full pipeline with meaningful retrieval diversity. The Kaggle notebook is parameterised — scale to 5000+ by changing one variable.
 
