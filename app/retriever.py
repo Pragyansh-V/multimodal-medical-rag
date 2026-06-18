@@ -129,12 +129,43 @@ class MultimodalRetriever:
 
     @traceable(name="merge_results", run_type="chain")
     def _merge_results(self, text_results, image_results, top_k) -> list[dict]:
+        text_normalized  = self._normalize_scores(text_results)
+        image_normalized = self._normalize_scores(image_results)
+
         seen = {}
-        for r in text_results + image_results:
+        for r in text_normalized + image_normalized:
             if r['id'] not in seen or r['similarity_score'] > seen[r['id']]['similarity_score']:
                 seen[r['id']] = r
+
         merged = sorted(seen.values(), key=lambda x: x['similarity_score'], reverse=True)
         return merged[:top_k]
+
+    def _normalize_scores(self, results: list[dict]) -> list[dict]:
+        """
+        Min-max normalize similarity scores within a single result set to [0, 1].
+        Needed before merging text (MiniLM) and image (CLIP) results, since their
+        raw cosine similarities occupy different, non-comparable numeric ranges.
+        """
+        if not results:
+            return results
+
+        scores = [r['similarity_score'] for r in results]
+        min_score, max_score = min(scores), max(scores)
+        score_range = max_score - min_score
+
+        normalized = []
+        for r in results:
+            r_copy = r.copy()
+            if score_range > 0:
+                r_copy['similarity_score'] = round(
+                    (r['similarity_score'] - min_score) / score_range, 4
+                )
+            else:
+                # all scores identical — avoid divide-by-zero, treat as max relevance
+                r_copy['similarity_score'] = 1.0
+            normalized.append(r_copy)
+
+        return normalized
 
     @property
     def is_loaded(self) -> bool:
