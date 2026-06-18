@@ -166,6 +166,7 @@ This finding was only visible through span-level tracing — the aggregate RAGAS
 metrics alone couldn't distinguish "hybrid mode is blending well" from "hybrid 
 mode is accidentally behaving like text-only mode."
 
+---
 
 ## Project Structure
 
