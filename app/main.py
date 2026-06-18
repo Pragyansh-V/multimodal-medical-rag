@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
+from langsmith import traceable
 
 from app.schemas import QueryRequest, QueryResponse, RetrievedContext, HealthResponse
 from app.retriever import MultimodalRetriever
@@ -37,7 +38,7 @@ app = FastAPI(
     - Dataset    : PathVQA (500 sampled examples)
     - Embeddings : CLIP ViT-L/14 (images) + all-MiniLM-L6-v2 (text)
     - Vector DB  : ChromaDB
-    - VLM        : Gemini 2.5 Flash
+    - VLM        : Gemini 3 Flash Preview
     - Retrieval  : text | image | hybrid
     """,
     version="1.0.0",
@@ -70,6 +71,7 @@ def health():
 
 
 @app.post("/query", response_model=QueryResponse, tags=["Query"])
+@traceable(name="query_route", run_type="chain")
 def query(request: QueryRequest):
     """
     Answer a medical question using multimodal RAG.
@@ -78,7 +80,7 @@ def query(request: QueryRequest):
     1. Embed question with MiniLM
     2. Retrieve top-k similar entries from ChromaDB
     3. Load retrieved pathology images
-    4. Send images + context to Gemini 2.5 Flash
+    4. Send images + context to Gemini 3 Flash Preview
     5. Return answer + retrieved contexts
     """
     if retriever is None or not retriever.is_loaded:

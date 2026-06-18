@@ -130,13 +130,50 @@ python evaluation/ragas_eval.py
 
 ---
 
+## Observability — LangSmith Tracing
+
+Instrumented the pipeline with LangSmith (`@traceable` decorators on `retrieve()`, 
+`_query_collection()`, `_merge_results()`, and `vlm.answer()`) to get span-level 
+visibility into where time and errors occur inside a `/query` call.
+
+**What tracing immediately revealed:**
+
+1. **Latency is almost entirely the VLM call, not retrieval.** A traced hybrid-mode 
+   query showed `retrieve()` completing in 0.21s while `vlm_answer()` took 304s — 
+   dominated by Gemini 3 Flash Preview's retry-on-overload logic during a period 
+   of high demand on the model. Retrieval was never the bottleneck; the VLM call 
+   was 1400x slower in this case.
+
+2. **Hybrid mode silently drops image-mode results in many queries — a real bug, 
+   not a corpus quirk.** Inspecting the `_query_collection` spans directly showed 
+   text-mode (MiniLM) similarity scores around 0.50–0.52, while image-mode (CLIP) 
+   scores for the same query sat around 0.21–0.22. Because `_merge_results` sorts 
+   the combined pool by raw similarity score and keeps the top-k, and these two 
+   scores are on non-comparable scales, text-mode results systematically win the 
+   sort — image-mode results get dropped entirely, even when they may be more 
+   visually relevant. This means hybrid mode's RAGAS faithfulness improvement 
+   (0.32 → 0.75, see Evaluation section above) may be partly attributable to 
+   silent text-mode dominance rather than genuine cross-modal blending.
+
+**Root cause:** CLIP cosine similarity and MiniLM cosine similarity are computed 
+independently and were never normalized to a shared scale before merging.
+
+**Fix (in progress):** Normalize each result set's scores (e.g. min-max scaling) 
+before merging, or switch to rank-based fusion (Reciprocal Rank Fusion) instead 
+of raw score comparison.
+
+This finding was only visible through span-level tracing — the aggregate RAGAS 
+metrics alone couldn't distinguish "hybrid mode is blending well" from "hybrid 
+mode is accidentally behaving like text-only mode."
+
+
 ## Project Structure
 
 ```
 multimodal-medical-rag/
 ├── app/
-│   ├── main.py          # FastAPI server — lifespan, routes
-│   ├── retriever.py     # ChromaDB + CLIP + MiniLM retrieval
+│   ├── main.py          # FastAPI server — lifespan, routes, top-level @traceable span
+│   ├── retriever.py     # ChromaDB + CLIP + MiniLM retrieval, @traceable on retrieve/query/merge
 │   ├── vlm.py           # Gemini 3 Flash Preview VLM answering, with retry on transient overload
 │   └── schemas.py       # Pydantic request/response schemas
 ├── evaluation/
@@ -208,6 +245,7 @@ Open `http://localhost:8000/docs` for the Swagger UI.
 | FastAPI | API server |
 | PathVQA | Pathology image-question dataset |
 | Kaggle T4 GPU | Embedding generation |
+| LangSmith | Execution tracing — span-level latency and I/O visibility |
 
 ---
 

@@ -6,6 +6,7 @@ import torch
 import numpy as np
 from pathlib import Path
 from dotenv import load_dotenv
+from langsmith import traceable
 
 import chromadb
 import open_clip
@@ -73,6 +74,7 @@ class MultimodalRetriever:
             embedding = embedding / embedding.norm(dim=-1, keepdim=True)
         return embedding[0].cpu().numpy().tolist()
 
+    @traceable(name="retrieve", run_type="chain")
     def retrieve(self, question: str, top_k: int = 3, mode: str = "text") -> list[dict]:
         if mode == "text":
             return self._query_collection(
@@ -101,6 +103,7 @@ class MultimodalRetriever:
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
+    @traceable(name="query_collection", run_type="retriever")
     def _query_collection(self, collection, query_embedding, top_k) -> list[dict]:
         response = collection.query(
             query_embeddings=[query_embedding],
@@ -124,6 +127,7 @@ class MultimodalRetriever:
             })
         return results
 
+    @traceable(name="merge_results", run_type="chain")
     def _merge_results(self, text_results, image_results, top_k) -> list[dict]:
         seen = {}
         for r in text_results + image_results:

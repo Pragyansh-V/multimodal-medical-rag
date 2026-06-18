@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from PIL import Image
 from google import genai
 from google.genai import types
+from langsmith import traceable
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -31,6 +32,8 @@ class VLMClient:
         self.model  = MODEL
         print(f"✅ VLM client initialised — {self.model}")
 
+    
+    @traceable(name="vlm_answer", run_type="llm")
     def answer(
         self,
         question: str,
