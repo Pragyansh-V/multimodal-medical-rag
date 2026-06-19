@@ -14,7 +14,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL          = "gemini-3-flash-preview"
+MODEL          = "gemini-3-flash-preview"  # Gemini 3 Flash Preview
 MAX_IMAGES     = 3  # max images to send per request — keeps tokens manageable
 MAX_RETRIES    = 3  # retries for transient 503 "model overloaded" errors
 

@@ -1,11 +1,16 @@
 user_input,retrieved_contexts,response,reference,faithfulness,answer_relevancy,context_precision,context_recall
-what is present?,"['Q: what is present? A: vasculature', 'Q: what is present? A: liver', 'Q: what is present? A: liver']","Based on the visual evidence and the provided context, the images show the **liver** and its **vasculature**. Specifically, the gross image displays a liver specimen with a focal lesion, while the microscopic images show liver parenchyma and vascular structures.",spleen,0.5,0.620517378355136,0.3333333333,0.0
-what does this image show?,"['Q: what does this image show? A: meningococcemia', 'Q: what does this image show? A: schwanoma neurilemoma', 'Q: what does this image show? A: anaplastic carcinoma with desmoplasia large myofibroblastic cell are prominent in the stroma']","Based on the provided images and context, the findings are as follows:
+what is present?,"['Q: what is present? A: cardiovascular', 'Q: what is present? A: oral', 'Q: what is present? A: bone marrow']","Based on the visual evidence and the provided context, the following are present:
 
-*   **Image",predominant epithelial excellent histology,1.0,0.7466364142393284,0.0,0.0
-what is present?,"['Q: what is present? A: vasculature', 'Q: what is present? A: liver', 'Q: what is present? A: liver']","Based on the pathology images and the provided context, the specimens show the presence of **liver** tissue and **vasculature**.
+*   **Cardiovascular:** The first image shows a gross specimen of a heart valve (likely aortic) with pathological changes.
+*   **Oral:** The second image is a dental radiograph showing teeth and the surrounding jawbone structure.
+*   **Bone marrow:** The third image is a microscopic view of a bone marrow aspirate or blood smear showing various hematopoietic cells.",spleen,0.0,0.585559626832351,0.0,0.0
+what does this image show?,"['Q: what does this image show? A: primary herpetic gingivo-stomatitis', 'Q: what does this image show? A: large ulcers probably secondary to tube', 'Q: what does this image show? A: anaplastic carcinoma with desmoplasia large myofibroblastic cell are prominent in the stroma']","Based on the provided pathology images and context, the images show the following:
 
-Specifically:
-*   The first image is a gross specimen of a **liver** containing a well-circumscribed lesion.
-*   The second image shows a microscopic view of a large blood vessel (**vasculature**) with a thickened wall and central thrombus.
-*   The third image shows a high-power microscopic view of **liver** parenchyma and portal structures.",gangrene,,0.5930401265959012,0.0,0.0
+*   **Image 1:** Primary herpetic gingivo-stomatitis, characterized by widespread inflammation and ulceration of the gingiva and oral mucosa.
+*   **Image 2:** Large ulcers in the larynx/trachea, likely secondary to pressure necrosis from an endotracheal tube.
+*   **Image 3:** Anaplastic carcinoma with desmoplasia, where large myofibroblastic cells are prominent within the reactive stroma.",predominant epithelial excellent histology,0.36363636363636365,0.69967179527952,0.0,0.0
+what is present?,"['Q: what is present? A: cardiovascular', 'Q: what is present? A: oral', 'Q: what is present? A: bone marrow']","Based on the provided pathology images and the associated context, the following are present:
+
+*   **Cardiovascular:** The first image shows a gross specimen of a heart valve (likely the aortic valve).
+*   **Oral:** The second image is a dental radiograph showing teeth and the jawbone.
+*   **Bone marrow:** The third image",gangrene,0.16666666666666666,0.5820415367690766,0.0,0.0
