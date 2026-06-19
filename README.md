@@ -89,14 +89,21 @@ curl -X POST "http://localhost:8000/query" \
 ```json
 {
   "question": "Is there evidence of inflammation in this tissue?",
-  "answer": "Yes, there is clear evidence of inflammation — numerous inflammatory cells with small dark blue nuclei infiltrating between muscle fibers.",
+  "answer": "No, there is no evidence of inflammation. The images and context indicate a diffuse infiltration of the bone marrow...",
   "retrieved_contexts": [
     {
-      "id": "pathvqa_166",
-      "question": "what contains epithelioid cell granulomas with caseation necrosis?",
-      "answer": "interstitium",
-      "similarity_score": 0.5488,
-      "image_path": "data/sample_images/pathvqa_166.jpg"
+      "id": "pathvqa_42",
+      "question": "are neutrophils seen in some cases of systemic sclerosis, sjogren syndrome, and other diseases?",
+      "answer": "no",
+      "similarity_score": 1.0,
+      "image_path": "data/sample_images/pathvqa_42.jpg"
+    },
+    {
+      "id": "pathvqa_485",
+      "question": "does this image show vertebral bodies with typical gelatinous-hemorrhagic lesions?",
+      "answer": "yes",
+      "similarity_score": 1.0,
+      "image_path": "data/sample_images/pathvqa_485.jpg"
     }
   ],
   "retrieval_mode": "hybrid",
@@ -104,6 +111,8 @@ curl -X POST "http://localhost:8000/query" \
   "num_contexts": 3
 }
 ```
+*(Note: similarity_score values above are post-normalization — see Observability 
+section for why raw CLIP and MiniLM scores needed rescaling before merging.)*
 
 ---
 
@@ -118,9 +127,9 @@ Ran RAGAS evaluation comparing text-only vs hybrid retrieval modes on sample Pat
 | Context Precision | 0.00 | 0.11 | 0.00 |
 | Context Recall | 0.00 | 0.00 | 0.00 |
 
-**Key finding:** Hybrid retrieval (CLIP image embeddings + text embeddings) substantially improves faithfulness and precision over text-only retrieval. PathVQA reuses generic question templates (e.g. "what is present?") across many different images — text similarity alone can't distinguish between them, but CLIP's visual matching can.
-
-**Known limitation:** Context recall remained 0.0 in both modes — even hybrid retrieval returned duplicate results for some queries (e.g. "liver" retrieved twice for the same question). This suggests the 500-example knowledge base is too small for some ground-truth answers to be retrievable at all. A production system would need retrieval deduplication and a substantially larger knowledge base.
+The pre-fix vs post-fix hybrid columns reflect a real bug found via LangSmith 
+tracing and fixed during evaluation — see **Observability** below for the full 
+investigation and what these numbers actually mean.
 
 Run the evaluation yourself:
 
@@ -198,7 +207,7 @@ multimodal-medical-rag/
 ├── app/
 │   ├── main.py          # FastAPI server — lifespan, routes, top-level @traceable span
 │   ├── retriever.py     # ChromaDB + CLIP + MiniLM retrieval, @traceable on retrieve/query/merge
-│   ├── vlm.py           # Gemini 3 Flash Preview VLM answering, with retry on transient overload
+│   ├── vlm.py            # Gemini 3 Flash Preview VLM answering, @traceable, retry on transient overload
 │   └── schemas.py       # Pydantic request/response schemas
 ├── evaluation/
 │   ├── test_set.py      # Ground-truth test questions from PathVQA metadata
